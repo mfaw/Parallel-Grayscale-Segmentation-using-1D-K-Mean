@@ -57,7 +57,7 @@ bool first_iter = true;
  and sets the initial centroid for each cluster to a random value if reduced_cluster is NULL, or to the centroid of a 
  reduced set of clusters if reduced_cluster is not NULL.*/
 Cluster* init_clusters(bool grayscale = true, int num_cluster = 3, Cluster* reduced_cluster = NULL) {
-/* -The grayscale parameter is a flag that indicates whether the input image is grayscale (true) or color (false).
+/* -The grayscale parameter is a flag that indicates whether the output image will be grayscale (true) or color (false).
    -The num_cluster parameter specifies the number of clusters to create.
    -The reduced_cluster parameter is an optional pointer to an array of reduced clusters that can be used to initialize 
 	the centroids of the new clusters.*/
@@ -207,8 +207,6 @@ the clusters accordingly.*/
 				}
 			}
 
-
-
 			// compute new centroid for each cluster
 			// reset the sum of points in each cluster
 
@@ -230,7 +228,7 @@ atomically.*/
 				}
 			}
 
-/*The loop uses a barrier to ensure that all threads have finished computing the new centroids for their private clusters*/
+/*The loop uses a barrier to ensure that all threads have finished computing the new centroids for their private cluster*/
 #pragma omp barrier
 
 /*After all threads have finished computing the new centroids for their private clusters, the #pragma omp single 
@@ -376,6 +374,5 @@ directive is used to ensure that only one thread updates the shared clusters arr
 	imshow("Display Window", Input_Image);
 	waitKey(0);
 	printf("print steps : %d\n", step);
-
 	return 0;
 }

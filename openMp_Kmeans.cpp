@@ -13,10 +13,10 @@ using namespace cv;
 using namespace std;
 
 #define MAXIMUM_STEPS 50
-#define NUM_CLUSTERS 20
-#define GRAYSCALE true	
+#define NUM_CLUSTERS 10
+#define GRAYSCALE false	
 #define IMG "Hazem.jpeg"
-#define N_THREADS 4
+#define N_THREADS 3
 /*
  compute euclidean distance between 2 pixels
  dim = 1 if grey scale
