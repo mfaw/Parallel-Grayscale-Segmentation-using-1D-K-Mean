@@ -6,54 +6,66 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iomanip>
 #include <math.h>
-#include <chrono>
+
 
 using namespace cv;
 using namespace std;
-using namespace std::chrono;
-#define MAXIMUM_STEPS 50
-#define NUM_CLUSTERS 8
+
+/*
+   manually set the:
+   1- maximum steps of iteration
+   2- number of clusteers (k)
+   3- if we want output to be grayscale (true), output to be RGB (false)
+*/
+#define MAXIMUM_STEPS 2000
+#define NUM_CLUSTERS 11
 #define GRAYSCALE false
-#define IMG "test.jpg"
 
-
-// compute euclidean distance between 2 pixels
-// dim = 1 if grey scale
-// dim = 3 if RGB
+/*
+ compute euclidean distance between 2 pixels
+ dim = 1 if grey scale
+ dim = 3 if RGB
+*/
 float compute_distance(float* p1, float* p2, int dim = 1) {
 	float result = 0.0;
-	for (int i = 0; i < dim; i++) {
+	for (int i = 0;  i < dim; i++) {
 		result += (float)pow((*(p1 + i)) - (*(p2 + i)), 2);
 	}
 	return sqrt(result);
 }
 
-// struct for each cluster that will contain the centroid
-// the number of points in each cluster
-// the sum of points for each cluster
-
+/*
+ struct for each cluster that will contain the centroids
+ the number of points in each cluster
+ the sum of points for each cluster
+*/
 struct Cluster
 {
-	float* centroid = new float[NUM_CLUSTERS];
+	float* centroid = new float [NUM_CLUSTERS];
 	int points_in_cluster = 0;
-	long double* sum_points = new long double[GRAYSCALE ? 1 : 3];
+	long double* sum_points = new long double [GRAYSCALE ? 1:3];
 }clusters[NUM_CLUSTERS];
 
-float** old_centroid = new float* [NUM_CLUSTERS];
+float** old_centroid = new float*[NUM_CLUSTERS];
 bool first_iter = true;
 
 int main()
 {
-	auto start = high_resolution_clock::now();
 	// read the image
-	Mat greyMat, Input_Image = imread(IMG);
+	Mat greyMat, Input_Image = imread("RGB.jpg");
 	// change image to grayscale and get grayscale matrix
 	greyMat = Input_Image;
-	if (GRAYSCALE)
+	if(GRAYSCALE)
 		cvtColor(Input_Image, greyMat, COLOR_BGR2GRAY);
 	Input_Image = greyMat;
 	cout << "Height: " << Input_Image.rows << ", Width: " << Input_Image.cols << ", Channels: " << Input_Image.channels() << endl;
-	for (int i = 0; i < NUM_CLUSTERS; i++) {
+
+	/*
+	initialize the cluster centroids using random numbers and set sum of points to 0
+	if it's grayscale segmentation, we have 1 array of centroids and sum of points array
+	if it's RGB segmentation, we have 3 arrays of centroids for each cluster and 3 sum of points array ( 1 for each R, G, B)
+	*/
+ 	for (int i = 0; i < NUM_CLUSTERS; i++) {
 		if (GRAYSCALE) {
 			clusters[i].centroid = new float[1];
 			clusters[i].centroid[0] = rand() % 256;
@@ -71,16 +83,25 @@ int main()
 			clusters[i].sum_points[2] = 0;
 		}
 	}
-	//for (int i = 0; i < NUM_CLUSTERS; i++) 
-		//printf("Cluster %d  : %f \n", i, clusters[i].centroid[0]);
+
+	// while loop to iterate used to compute new centroids
+	// break condition is centroids not changed
 	int step = 0;
 	while (step < MAXIMUM_STEPS) {
+	// loop over the pixels matrix
 		for (int row = 0; row < Input_Image.rows; row++) {
 			for (int col = 0; col < Input_Image.cols; col++) {
 				float minimum_distance = INFINITY;
 				int minimum_index = -1;
 				float* minimum_point = NULL;
-				// this won't be done in parallel
+				/*
+				    in this for loop, we loop over the clusters and store the value in the pixel array
+				    then, compute the distance between the centroid of the cluster and the current pixel
+				    if distance is less than minimum distance:
+				    we assign minimum point to pixel, minimum distance to the computed distance, and
+				    minimum index to current cluster
+				    by this, the point is assigned to the closest cluster
+				*/
 				for (int c = 0; c < NUM_CLUSTERS; c++) {
 					float* pixel;
 					if (GRAYSCALE) {
@@ -101,26 +122,22 @@ int main()
 						minimum_index = c;
 					}
 				}
+				// increment the points in cluster
 				clusters[minimum_index].points_in_cluster++;
-				//printf("centroid : %f \n", clusters[minimum_index].sum_points[0]);
-				//printf("point : %f \n", minimum_point[0]);
-				if (GRAYSCALE)
-					clusters[minimum_index].sum_points[0] += (long double)minimum_point[0];
+				// add point to the cluster's sum_points
+				if(GRAYSCALE)
+					clusters[minimum_index].sum_points[0] += (long double) minimum_point[0];
 				else {
-					clusters[minimum_index].sum_points[0] += (long double)minimum_point[0];
-					clusters[minimum_index].sum_points[1] += (long double)minimum_point[1];
-					clusters[minimum_index].sum_points[2] += (long double)minimum_point[2];
+					clusters[minimum_index].sum_points[0] += (long double) minimum_point[0];
+					clusters[minimum_index].sum_points[1] += (long double) minimum_point[1];
+					clusters[minimum_index].sum_points[2] += (long double) minimum_point[2];
 				}
-				//printf("centroid : %f \n", clusters[minimum_index].sum_points[0]);
-				//system("pause");
+
 			}
 		}
-		// compute new centroid for each cluster
-		// reset the sum of points in each cluster
+		// compute new centroid for each cluster by dividing sum of points and the points in the cluster
+		// reset the sum of points in each cluster and reset the points in cluster to 0 for each cluster
 		for (int i = 0; i < NUM_CLUSTERS; i++) {
-			//printf("centroid : %f \n", clusters[i].sum_points[0]);
-			if (clusters[i].points_in_cluster == 0)
-				continue;
 			if (GRAYSCALE) {
 				clusters[i].centroid[0] = (long double)clusters[i].sum_points[0] / clusters[i].points_in_cluster;
 				clusters[i].sum_points[0] = 0.0;
@@ -133,10 +150,11 @@ int main()
 				clusters[i].sum_points[1] = 0.0;
 				clusters[i].sum_points[2] = 0.0;
 			}
-			//printf("centroid : %f \n", clusters[i].centroid[0]);
-			//printf("Cluster %d : %d \n",i,clusters[i].points_in_cluster);
 			clusters[i].points_in_cluster = 0;
 		}
+
+		// assign the centroids of each cluster to the old centroid if it's the first iteration
+		// and change the first_iter flag to false
 		if (first_iter) {
 			for (int i = 0; i < NUM_CLUSTERS; i++) {
 				if (GRAYSCALE) {
@@ -151,6 +169,11 @@ int main()
 			}
 			first_iter = false;
 		}
+		// break condition check if it's not the first iteration
+		// compute the distance between the old centroid and the current centorid, if it's greater than 0.0001
+		// change the condition flag to false and assign the old centroid to the current centroid
+		// if distance is less than 0.0001 the condition flag is true, so we break of the while loop showing that we
+		// reached the final clusters
 		else {
 			bool condition = true;
 			for (int i = 0; i < NUM_CLUSTERS; i++) {
@@ -176,15 +199,16 @@ int main()
 				}
 			}
 		}
-
-
-		//printf("\n");
-	 //here will be a barrier 
 		step++;
 	}
+	/*This part of the program prints the final cluster centroids after the clustering algorithm has converged.
+	Specifically, the code iterates over all clusters and prints their centroid coordinates.*/
 	for (int i = 0; i < NUM_CLUSTERS; i++) {
 		printf("clusters %d : %f \n", i, clusters[i].centroid[0]);
 	}
+	/* This for loop, iterates over the pixels in the input image and finds the nearest cluster centroid for each pixel
+	by computing the distance between the pixel and each cluster centroid, then it assigns the value of centroid of the
+	nearest cluster to the pixel of the input image*/
 	for (int row = 0; row < Input_Image.rows; row++) {
 		for (int col = 0; col < Input_Image.cols; col++) {
 			float minimum_distance = INFINITY;
@@ -222,14 +246,6 @@ int main()
 			}
 		}
 	}
-	auto stop = high_resolution_clock::now();
-	auto duration = duration_cast<microseconds>(stop - start);
-	cout << "Time taken by function: "
-		<< duration.count() * 1e-6 << " seconds " << endl;
-	Mat image = imread(IMG);
-	imshow("Display Window", image);
-	waitKey(0);
-
 	imshow("Display Window", Input_Image);
 	waitKey(0);
 	printf("print steps : %d", step);
